@@ -1,0 +1,40 @@
+name: Test all core libraries and agents
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        repo:
+          - volttron-testing
+          - volttron-lib-base-driver
+          - volttron-lib-bacnet-driver
+          - volttron-modbustk-driver
+          - volttron-lib-modbus-driver
+          - volttron-lib-fake-driver
+          - volttron-actuator
+          - volttron-platform-driver
+          - volttron-bacnet-proxy
+          - volttron-lib-tagging
+          - volttron-sqlite-tagging
+          - volttron-mongo-tagging
+          - volttron-lib-base-historian
+          - volttron-lib-sql-historian
+          - volttron-postgresql-historian
+          - volttron-sqlite-historian
+          - volttron-listener
+          - volttron-lib-web
+    steps:
+      - name: Invoke run-tests on core repos
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: run-tests.yml
+          repo: eclipse-volttron/${{ matrix.repo }}
+          token: ${{secrets.GA_PAT_TOKEN}}
