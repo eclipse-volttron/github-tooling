@@ -74,16 +74,18 @@ jobs:
           poetry install --no-interaction
 
       - name: bump pyproject.toml version
+        if: ${{ github.ref_name }} != "${{main}}"
         run: |
             current_version=$(poetry version --short)
             echo $current_version
             poetry version prerelease --no-interaction
             NEW_TAG=v$(poetry version --short)
             echo "NEW_TAG=$(echo ${NEW_TAG})" >> $GITHUB_ENV
-            echo "source branch is ${{ GITHUB_HEAD_REF }}"
-#      - uses: stefanzweifel/git-auto-commit-action@v5
-#        with:
-#          commit_message: bumped pre-release version
+            echo "source branch is ${{ github.ref_name }}"
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: bumped pre-release version to ${{ env.NEW_TAG }}
+          branch: ${{ github.ref_name }}
 #
       #---------------------------------------------------------------
       # create build artifacts to be included as part of release
