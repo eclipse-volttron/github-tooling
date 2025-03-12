@@ -74,7 +74,6 @@ jobs:
           poetry install --no-interaction
 
       - name: bump pyproject.toml version
-        if: ${{ github.ref_name }} != "${{main}}"
         run: |
             current_version=$(poetry version --short)
             echo $current_version
