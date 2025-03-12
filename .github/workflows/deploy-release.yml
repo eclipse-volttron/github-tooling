@@ -183,6 +183,21 @@ jobs:
           # we don't really persist right version in pyproject.toml to figure out the next version. we use git tags.
           git restore pyproject.toml
 
+      - name: Use given release-version number
+        if: inputs.release-version != ''
+        run: |
+          echo "Using given release version is ${{ inputs.release-version }}"
+          poetry version ${{ inputs.release-version }}
+
+          NEW_TAG=v$(poetry version --short)
+
+          # we want to be able to use the variable in later
+          # steps we set a NEW_TAG environmental variable
+          echo "NEW_TAG=$(echo ${NEW_TAG})" >> $GITHUB_ENV
+          # we don't want to update pyproject.toml yet. don't want this change to create merge conflict.
+          # we don't really persist right version in pyproject.toml to figure out the next version. we use git tags.
+          git restore pyproject.toml
+
       #----------------------------------------------
       # bump version number for patch
       #----------------------------------------------
@@ -192,6 +207,7 @@ jobs:
           # current_tag is the last tagged release in the repository.   From there
           # we need to remove the v from the beginning of the tag.
           echo "Bump rule is ${{ inputs.bump-rule }}"
+          echo "Given release version is ${{ inputs.release-version }}"
           if ! $(git tag -l "v*" = ''); then
             # uses -V which is version sort to keep it monotonically increasing.
             current_tag=$(git tag -l "v*" | grep --invert-match '-' | sort --reverse -V  | sed -n 1p)
@@ -277,7 +293,6 @@ jobs:
           echo "POETRY_PUBLISH_OPTIONS=''" >> $GITHUB_ENV
           poetry config pypi-token.pypi ${{ secrets.pypi-token }}
           poetry publish
-
       - name: Publish to test-pypi
         if: ${{ inputs.publish-option == 'test-pypi' }}
         run: |
