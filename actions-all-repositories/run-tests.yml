@@ -14,7 +14,8 @@ on:
       - reopened
     paths:
       - '**.py'
-workflow_dispatch:
+      -
+  workflow_dispatch:
 
 defaults:
   run:
@@ -23,7 +24,6 @@ defaults:
 env:
   LANG: en_US.utf-8
   LC_ALL: en_US.utf-8
-  PYTHON_VERSION: '3.10'
   PROJECT_NAME: volttron-core
 
 jobs:
