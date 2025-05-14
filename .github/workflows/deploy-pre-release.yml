@@ -2,8 +2,12 @@
 name: Deploy Pre-Release Artifacts
 
 on:
-  # Assume caller is using secret: inherit
-  workflow_call: {}
+  workflow_call:
+    secrets:
+      git-token:
+        required: true
+      pypi-token:
+        required: true
 
 defaults:
   run:
@@ -20,10 +24,6 @@ jobs:
 
   deploy-pre-release:
     runs-on: ubuntu-22.04
-    permissions:
-        # Give the default GITHUB_TOKEN write permission to commit and push the
-        # added or changed files to the repository.
-        contents: write
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
@@ -33,11 +33,10 @@ jobs:
       #       check-out repo and set-up python
       #----------------------------------------------
       - name: Checkout code
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
-          token: ${{ secrets.AUTO_PROJECT_PAT }}
+          token: ${{ secrets.git-token }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         id: setup-python
@@ -108,10 +107,10 @@ jobs:
           commit: ${{ github.ref }}
           prerelease: true
           tag: ${{ env.NEW_TAG }}
-          token: ${{ secrets.PYPI_TOKEN }}
+          token: ${{ secrets.git-token }}
 
       - name: Publish pre-release to pypi
         if: github.repository_owner == "${{env.OWNER}}"
         run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+          poetry config pypi-token.pypi ${{ secrets.pypi-token }}
           poetry publish
