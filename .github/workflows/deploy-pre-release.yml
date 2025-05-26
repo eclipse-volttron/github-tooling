@@ -3,6 +3,9 @@ name: Deploy Pre-Release Artifacts
 
 on:
   workflow_call:
+   secrets:
+      pypi-token:
+        required: true
 
 defaults:
   run:
@@ -105,5 +108,5 @@ jobs:
       - name: Publish pre-release to pypi
         if: github.repository_owner == "${{env.OWNER}}"
         run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+          poetry config pypi-token.pypi ${{ secrets.pypi-token }}
           poetry publish
