@@ -30,7 +30,7 @@ jobs:
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - run: echo "🔎 This will publish changes in develop branch of repository ${{ github.repository }}."
 
       #----------------------------------------------
       #       check-out repo and set-up python
@@ -140,7 +140,7 @@ jobs:
         if: env.no_changes == 'false'
         with:
           commit_message: bumped pre-release version to ${{ env.NEW_TAG }}
-          branch: ${{ github.ref_name }}
+          branch: develop
 
       #---------------------------------------------------------------
       # Create build artifacts to be included as part of release
@@ -160,7 +160,7 @@ jobs:
           artifacts: "dist/*.gz,dist/*.whl"
           artifactErrorsFailBuild: true
           generateReleaseNotes: true
-          commit: ${{ github.ref }}
+          commit: develop
           prerelease: true
           tag: ${{ env.NEW_TAG }}
 
