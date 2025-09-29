@@ -89,8 +89,16 @@ jobs:
         id: get_latest_release
         run: |
           git fetch --tags
-          latest_tag=$(git describe --tags --abbrev=0)
-          echo "latest_tag=${latest_tag}" >> $GITHUB_ENV
+          # Check if any tags exist
+          if git describe --tags --abbrev=0 2>/dev/null; then
+            latest_tag=$(git describe --tags --abbrev=0)
+            echo "latest_tag=${latest_tag}" >> $GITHUB_ENV
+            echo "has_previous_release=true" >> $GITHUB_ENV
+            echo "Latest tag found: $latest_tag"
+          else
+            echo "No previous releases found"
+            echo "has_previous_release=false" >> $GITHUB_ENV
+          fi
         env:
           GITHUB_ENV: ${{ secrets.GITHUB_ENV }}
           
@@ -100,22 +108,37 @@ jobs:
       - name: Check for non-documentation changes
         id: check_changes
         run: |
-          git fetch --tags
-          latest_tag=$(git describe --tags --abbrev=0)
-          echo "Latest tag found: $latest_tag"
-
-          # Diff excluding documentation files
-          changes=$(git diff --name-only $latest_tag HEAD | grep -vE '(\.md|\.rst)$' || true)
-
-          # Log what was found by diff
-          echo "Detected changes: $changes"
-
-          if [[ -z "$changes" ]]; then
-            echo "No code changes detected. Skipping release."
-            echo "no_changes=true" >> $GITHUB_ENV
+          if [[ "${{ env.has_previous_release }}" == "true" ]]; then
+            latest_tag="${{ env.latest_tag }}"
+            echo "Comparing changes since tag: $latest_tag"
+            
+            # Diff excluding documentation files
+            changes=$(git diff --name-only $latest_tag HEAD | grep -vE '(\.md|\.rst)$' || true)
+            
+            # Log what was found by diff
+            echo "Detected changes: $changes"
+            
+            if [[ -z "$changes" ]]; then
+              echo "No code changes detected. Skipping release."
+              echo "no_changes=true" >> $GITHUB_ENV
+            else
+              echo "Non-documentation changes detected."
+              echo "no_changes=false" >> $GITHUB_ENV
+            fi
           else
-            echo "Non-documentation changes detected."
-            echo "no_changes=false" >> $GITHUB_ENV
+            # No previous release, so consider all non-documentation files as changes
+            echo "No previous release found. Checking for non-documentation files..."
+            
+            # List all tracked files excluding documentation
+            changes=$(git ls-files | grep -vE '(\.md|\.rst)$' || true)
+            
+            if [[ -z "$changes" ]]; then
+              echo "No non-documentation files found. Skipping release."
+              echo "no_changes=true" >> $GITHUB_ENV
+            else
+              echo "Non-documentation files detected. Will create first release."
+              echo "no_changes=false" >> $GITHUB_ENV
+            fi
           fi
         env:
           GITHUB_ENV: ${{ secrets.GITHUB_ENV }}
@@ -127,17 +150,28 @@ jobs:
         if: env.no_changes == 'false'
         run: |
             current_version=$(poetry version --short)
-            echo $current_version
-            poetry version prerelease --no-interaction
-            NEW_TAG=v$(poetry version --short)
+            echo "Current version: $current_version"
+            
+            if [[ "${{ env.has_previous_release }}" == "true" ]]; then
+              # Previous release exists, bump the version
+              echo "Bumping version from $current_version"
+              poetry version prerelease --no-interaction
+              NEW_TAG=v$(poetry version --short)
+            else
+              # No previous release, use current version as-is
+              echo "No previous release found. Using current version: $current_version"
+              NEW_TAG=v$current_version
+            fi
+            
             echo "NEW_TAG=$(echo ${NEW_TAG})" >> $GITHUB_ENV
+            echo "New tag will be: ${NEW_TAG}"
             echo "source branch is ${{ github.ref_name }}"
 
       # ----------------------------------------------
-      # Auto commit toml file
+      # Auto commit toml file (only if version was bumped)
       # ----------------------------------------------
       - uses: stefanzweifel/git-auto-commit-action@v5
-        if: env.no_changes == 'false'
+        if: env.no_changes == 'false' && env.has_previous_release == 'true'
         with:
           commit_message: bumped pre-release version to ${{ env.NEW_TAG }}
           branch: develop
