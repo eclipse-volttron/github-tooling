@@ -73,14 +73,33 @@ jobs:
       #----------------------------------------------
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root --without dev
+        run: |
+          if poetry show --only=dev >/dev/null 2>&1; then
+            echo "Dev group exists"
+            # Use --without dev
+            poetry install --no-interaction --no-root --without dev
+          else
+            echo "No dev group found"
+            # Use regular install
+            poetry install --no-interaction --no-root
+          fi
+
 
       #----------------------------------------------
       # Install your root project, if required
       #----------------------------------------------
       - name: Install library
         run: |
-          poetry install --no-interaction --without dev
+          if poetry show --only=dev >/dev/null 2>&1; then
+            echo "Dev group exists"
+            # Use --without dev
+            poetry install --no-interaction --without dev
+          else
+            echo "No dev group found"
+            # Use regular install
+            poetry install --no-interaction
+          fi
+          # poetry install --no-interaction --without dev
 
       # ----------------------------------------------
       # Get the latest release tag
@@ -101,7 +120,7 @@ jobs:
           fi
         env:
           GITHUB_ENV: ${{ secrets.GITHUB_ENV }}
-          
+
       # ----------------------------------------------
       # Check for changes excluding .md and .rst files
       # ----------------------------------------------
@@ -111,13 +130,13 @@ jobs:
           if [[ "${{ env.has_previous_release }}" == "true" ]]; then
             latest_tag="${{ env.latest_tag }}"
             echo "Comparing changes since tag: $latest_tag"
-            
+
             # Diff excluding documentation files
             changes=$(git diff --name-only $latest_tag HEAD | grep -vE '(\.md|\.rst)$' || true)
-            
+
             # Log what was found by diff
             echo "Detected changes: $changes"
-            
+
             if [[ -z "$changes" ]]; then
               echo "No code changes detected. Skipping release."
               echo "no_changes=true" >> $GITHUB_ENV
@@ -128,10 +147,10 @@ jobs:
           else
             # No previous release, so consider all non-documentation files as changes
             echo "No previous release found. Checking for non-documentation files..."
-            
+
             # List all tracked files excluding documentation
             changes=$(git ls-files | grep -vE '(\.md|\.rst)$' || true)
-            
+
             if [[ -z "$changes" ]]; then
               echo "No non-documentation files found. Skipping release."
               echo "no_changes=true" >> $GITHUB_ENV
@@ -151,7 +170,7 @@ jobs:
         run: |
             current_version=$(poetry version --short)
             echo "Current version: $current_version"
-            
+
             if [[ "${{ env.has_previous_release }}" == "true" ]]; then
               # Previous release exists, bump the version
               echo "Bumping version from $current_version"
@@ -162,7 +181,7 @@ jobs:
               echo "No previous release found. Using current version: $current_version"
               NEW_TAG=v$current_version
             fi
-            
+
             echo "NEW_TAG=$(echo ${NEW_TAG})" >> $GITHUB_ENV
             echo "New tag will be: ${NEW_TAG}"
             echo "source branch is ${{ github.ref_name }}"
