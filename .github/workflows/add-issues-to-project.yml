@@ -1,0 +1,48 @@
+name: Add org issues to project
+
+# Every open issue in any eclipse-volttron repo that is not yet on the org
+# project gets added. Search-based, so new repos are covered automatically.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+env:
+  ORG: eclipse-volttron
+  PROJECT_NUMBER: 15
+
+jobs:
+  sweep:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Add missing open issues to project
+        env:
+          # Needs 'project' (read/write) and 'repo' (read) on the org.
+          # GITHUB_TOKEN cannot write to org projects.
+          GH_TOKEN: ${{ secrets.AUTO_PROJECT_PAT }}
+        run: |
+          set -euo pipefail
+          project_id=$(gh project view "$PROJECT_NUMBER" --owner "$ORG" --format json --jq .id)
+          query="org:$ORG is:issue is:open archived:false -project:$ORG/$PROJECT_NUMBER"
+          ids=$(gh api graphql --paginate -f q="$query" -f query='
+            query($q: String!, $endCursor: String) {
+              search(query: $q, type: ISSUE, first: 100, after: $endCursor) {
+                nodes { ... on Issue { id url } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }' --jq '.data.search.nodes[] | "\(.id) \(.url)"')
+          if [ -z "$ids" ]; then
+            echo "Nothing to add."
+            exit 0
+          fi
+          added=0
+          while read -r id url; do
+            gh api graphql -f p="$project_id" -f c="$id" -f query='
+              mutation($p: ID!, $c: ID!) {
+                addProjectV2ItemById(input: {projectId: $p, contentId: $c}) { item { id } }
+              }' > /dev/null || { echo "::warning::Failed to add $url"; continue; }
+            echo "Added $url"
+            added=$((added + 1))
+          done <<< "$ids"
+          echo "Added $added issue(s)." >> "$GITHUB_STEP_SUMMARY"
